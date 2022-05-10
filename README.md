@@ -12,4 +12,6 @@ Also, you can choose a port on which to start, i.e.:
 
 To start cracking password you need to use this command:
 
-hashcat {passwordHash} {hashAlgorithm}
+* hashcat {passwordHash} {hashAlgorithm}
+
+The project uses HTTP for communication
