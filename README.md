@@ -1,10 +1,7 @@
 # hashcatnick
-P2P network for hashcat usage.
+P2P network for cracking passwords by their hash.
 
-This project is meant for using [hascat](https://hashcat.net/hashcat/) in a peer to peer network. So
-cracking passwords could be distributed between the network's users. Every user can propose own password crack.
-There will be a live queue of passwords to crack. Also, we'll consider implementing rating
-system to arrange this queue.
+This project proposes opportunity to distribute computation of password between peers.
 
 To start the main node start your jar file with argument main like this:
 * java -jar hashcatnick.jar main
@@ -12,3 +9,7 @@ To start the main node start your jar file with argument main like this:
 Also, you can choose a port on which to start, i.e.:
 * java -jar hashcatnick.jar 1234
 * java -jar hashcatnick.jar 4321 main
+
+To start cracking password you need to use this command:
+
+hashcat {passwordHash} {hashAlgorithm}
