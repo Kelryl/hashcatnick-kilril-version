@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import json.Node;
+import model.CrackPasswordMessage;
 import server.Server;
 import util.NodesFile;
 
@@ -75,8 +76,8 @@ public class Client {
                 break;
             case "hashcat":
                 String[] parsedString = input.split(" ");
-                sendHashFileOverNetwork(parsedString[2]);
-                composePostRequest(String.format(ADDRESS_FORMAT, mainNodeIp, mainNodePort), "process", input);
+                sendHashFileOverNetwork(parsedString);
+                //composePostRequest(String.format(ADDRESS_FORMAT, mainNodeIp, mainNodePort), "process", input);
                 break;
             case "clearNodes":
                 if (isMain)
@@ -91,14 +92,11 @@ public class Client {
         }
     }
     
-    public static void crackFile() {
-        List<String> hashes = readFile("currentHash");
+    public static void crackFile(CrackPasswordMessage message) {
         System.out.println("Start cracking");
         try {
-            PasswordCracker passwordCracker = new PasswordCracker();
-            for (String hash : hashes) {
-                System.out.println(passwordCracker.crack(hash));
-            }
+            PasswordCracker passwordCracker = new PasswordCracker(message.getAlgorithm());
+            System.out.println(passwordCracker.crack(message.getHash(), message.getNumberOfMembers(), message.getMemberNumber()));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -141,8 +139,10 @@ public class Client {
         }
     }
     
-    private void sendHashFileOverNetwork(String path) {
+    private void sendHashFileOverNetwork(String[] parsedString) {
         try {
+            int numberOfMembers = NodesFile.getInstance().getNodes().size();
+            int counter = 0;
             for (Node node : NodesFile.getInstance().getNodes()) {
                 final URL url = new URL("http://" + String.format(ADDRESS_FORMAT, node.getIp(), node.getPort()) +
                         "/file");
@@ -150,8 +150,14 @@ public class Client {
                 con.setRequestMethod("POST");
                 con.setRequestProperty("Content-Type", "text/plain");
                 con.setDoOutput(true);
+                
+                CrackPasswordMessage message = new CrackPasswordMessage(parsedString[1],
+                        parsedString[2],
+                        numberOfMembers,
+                        counter++);
+                
                 try (BufferedOutputStream bos = new BufferedOutputStream(con.getOutputStream());
-                     BufferedInputStream bis = new BufferedInputStream(new FileInputStream(path))) {
+                     BufferedInputStream bis = new BufferedInputStream(new FileInputStream(new ObjectMapper().writeValueAsString(message)))) {
                     int i;
                     while ((i = bis.read()) > -1) {
                         bos.write(i);

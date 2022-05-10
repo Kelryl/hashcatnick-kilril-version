@@ -1,6 +1,7 @@
 package server.parse;
 
 import client.Client;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 
 import cracker.PasswordCracker;
@@ -11,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import model.CrackPasswordMessage;
 import util.NodesFile;
 
 public class PostParser implements Parser {
@@ -42,7 +44,7 @@ public class PostParser implements Parser {
         return ret;
     }
     
-    private String readFile(HttpExchange req) {
+    private String  readFile(HttpExchange req) {
         try (BufferedReader br = new BufferedReader(new InputStreamReader(req.getRequestBody(), StandardCharsets.UTF_8));
              FileWriter writer = new FileWriter("currentHash")) {
             StringBuilder buffer = new StringBuilder();
@@ -51,8 +53,12 @@ public class PostParser implements Parser {
                 buffer.append(line).append("\n");
             }
             writer.write(buffer.toString());
+            CrackPasswordMessage message = new ObjectMapper().readValue(buffer.toString(), CrackPasswordMessage.class);
             writer.flush();
-            new Thread(this::crackFile).start();
+            new Thread(
+                    () -> this.crackFile(message)
+            )
+                    .start();
             return "Everything is okay";
         } catch (IOException e) {
             e.printStackTrace();
@@ -60,8 +66,8 @@ public class PostParser implements Parser {
         return "Something went wrong!";
     }
     
-    private void crackFile() {
-        Client.crackFile();
+    private void crackFile(CrackPasswordMessage message) {
+        Client.crackFile(message);
     }
     
     private String readReqBody(final HttpExchange exchange) {
