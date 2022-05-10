@@ -5,6 +5,7 @@ import cracker.PasswordCracker;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import json.Node;
 import model.CrackPasswordMessage;
+import model.PasswordResult;
 import server.Server;
 import util.NodesFile;
 
@@ -33,6 +35,8 @@ public class Client {
     private final int mainNodePort = NodesFile.getInstance().mainNodePort();
     private final AtomicInteger port = new AtomicInteger();
     private Server server;
+    
+    public static AtomicBoolean IS_CRACKING_RUNNING = new AtomicBoolean(false);
     
     public void start(final boolean isMainNode,
                       final int prt) throws IOException {
@@ -77,7 +81,6 @@ public class Client {
             case "hashcat":
                 String[] parsedString = input.split(" ");
                 sendHashFileOverNetwork(parsedString);
-                //composePostRequest(String.format(ADDRESS_FORMAT, mainNodeIp, mainNodePort), "process", input);
                 break;
             case "clearNodes":
                 if (isMain)
@@ -93,10 +96,12 @@ public class Client {
     }
     
     public static void crackFile(CrackPasswordMessage message) {
-        System.out.println("Start cracking");
         try {
+            IS_CRACKING_RUNNING.set(true);
             PasswordCracker passwordCracker = new PasswordCracker(message.getAlgorithm());
-            System.out.println(passwordCracker.crack(message.getHash(), message.getNumberOfMembers(), message.getMemberNumber()));
+            PasswordResult result = passwordCracker.crack(message.getHash(), message.getNumberOfMembers(), message.getMemberNumber());
+            
+            if (result != null) sendResultOverNetwork(result);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -139,7 +144,34 @@ public class Client {
         }
     }
     
-    private void sendHashFileOverNetwork(String[] parsedString) {
+    private static void sendResultOverNetwork(PasswordResult result) {
+        try {
+            for (Node node : NodesFile.getInstance().getNodes()) {
+                final URL url = new URL("http://" + String.format(ADDRESS_FORMAT, node.getIp(), node.getPort()) +
+                        "/result");
+                final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                con.setRequestMethod("POST");
+                con.setRequestProperty("Content-Type", "text/plain");
+                con.setDoOutput(true);
+            
+                try (BufferedOutputStream bos = new BufferedOutputStream(con.getOutputStream());
+                     BufferedInputStream bis = new BufferedInputStream(new ByteArrayInputStream(new ObjectMapper().writeValueAsString(result).getBytes()))) {
+                    int i;
+                    while ((i = bis.read()) > -1) {
+                        bos.write(i);
+                    }
+                    bos.flush();
+                }
+                continueConnection(con);
+            }
+        } catch (ConnectException ce) {
+            System.out.println(ce.getMessage() + ". Enter 'exit' to finish the program.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private static void sendHashFileOverNetwork(String[] parsedString) {
         try {
             int numberOfMembers = NodesFile.getInstance().getNodes().size();
             int counter = 0;
@@ -157,7 +189,7 @@ public class Client {
                         counter++);
                 
                 try (BufferedOutputStream bos = new BufferedOutputStream(con.getOutputStream());
-                     BufferedInputStream bis = new BufferedInputStream(new FileInputStream(new ObjectMapper().writeValueAsString(message)))) {
+                     BufferedInputStream bis = new BufferedInputStream(new ByteArrayInputStream(new ObjectMapper().writeValueAsString(message).getBytes(StandardCharsets.UTF_8)))) {
                     int i;
                     while ((i = bis.read()) > -1) {
                         bos.write(i);
@@ -222,7 +254,7 @@ public class Client {
         }
     }
     
-    private List<String> continueConnection(HttpURLConnection con) throws IOException {
+    private static List<String> continueConnection(HttpURLConnection con) throws IOException {
         con.setConnectTimeout(5000);
         con.setReadTimeout(5000);
         con.setInstanceFollowRedirects(false);

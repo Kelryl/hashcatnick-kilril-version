@@ -1,6 +1,7 @@
 package server.parse;
 
 import client.Client;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -13,6 +14,7 @@ import java.io.PrintWriter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import model.CrackPasswordMessage;
+import model.PasswordResult;
 import util.NodesFile;
 
 public class PostParser implements Parser {
@@ -37,6 +39,18 @@ public class PostParser implements Parser {
             case "/file":
                 ret = readFile(req);
                 break;
+            case "/result":
+                ret = readReqBody(req);
+                try {
+                    PasswordResult result = new ObjectMapper().readValue(ret, PasswordResult.class);
+                    System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    System.out.printf("Password %s was got on %d%n", result.getResult(), result.getMemberID());
+                    System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    Client.IS_CRACKING_RUNNING.set(false);
+                } catch (JsonProcessingException ignored) {
+                    System.out.println(ignored);
+                }
+                break;
             default:
                 ret = "=====\nUnknown request!\n====\n" + req.getRequestURI().toString();
                 break;
@@ -44,7 +58,7 @@ public class PostParser implements Parser {
         return ret;
     }
     
-    private String  readFile(HttpExchange req) {
+    private String readFile(HttpExchange req) {
         try (BufferedReader br = new BufferedReader(new InputStreamReader(req.getRequestBody(), StandardCharsets.UTF_8));
              FileWriter writer = new FileWriter("currentHash")) {
             StringBuilder buffer = new StringBuilder();

@@ -1,6 +1,8 @@
 package cracker;
 
+import client.Client;
 import java.security.MessageDigest;
+import model.PasswordResult;
 
 import static util.CrackUtilities.MAX_CHAR_VALUE;
 import static util.CrackUtilities.MIN_CHAR_VALUE;
@@ -20,7 +22,7 @@ public class PasswordCracker {
         guess = null;
     }
     
-    public String crack(String hash, int numberOfMembers, int memberNumber) {
+    public PasswordResult crack(String hash, int numberOfMembers, int memberNumber) {
         String guessHash;
     
         int diff = (maxCharValue - minCharValue + 1) / numberOfMembers;
@@ -29,7 +31,7 @@ public class PasswordCracker {
         char maxFirstChar = memberNumber == (numberOfMembers - 1) ? maxCharValue : (char) (minFirstChar + diff - 1);
     
         System.out.println("================");
-        System.out.println(String.format("Cracking on node number %d start with %c and ending with %c", memberNumber + 1, minFirstChar, maxFirstChar));
+        System.out.printf("Cracking on node number %d start with %c and ending with %c %n Hash is %s%n", memberNumber + 1, minFirstChar, maxFirstChar, hash);
         System.out.println("================");
     
         for (int num_chars = 0; num_chars < maxNumChars; num_chars++) {
@@ -37,20 +39,25 @@ public class PasswordCracker {
             for (int x = 0; x < num_chars; x++) {
                 guess[x] = x == 0 ? minFirstChar : minCharValue;
             }
-            while (canIncrementGuess(minFirstChar, maxFirstChar)) {
-                incrementGuess(minFirstChar, maxFirstChar);
+            while (canIncrementGuess(maxFirstChar)) {
+                if (!Client.IS_CRACKING_RUNNING.get()) {
+                    System.out.println("Cracking was stopped!!!!!!!");
+                    break;
+                }
+                incrementGuess(maxFirstChar);
                 md.reset();
                 md.update(new String(guess).getBytes());
                 guessHash = hashToString(md.digest());
+                
                 if (hash.equals(guessHash)) {
-                    return new String(guess);
+                    return new PasswordResult(new String(guess), memberNumber);
                 }
             }
         }
-        return "new String(guess)";
+        return null;
     }
     
-    protected boolean canIncrementGuess(char minFirstChar, char maxFirstChar) {
+    protected boolean canIncrementGuess(char maxFirstChar) {
         for (int i = 0; i < guess.length; i++) {
             if (i == 0 && guess[i] < maxFirstChar || i != 0 && guess[i] < maxCharValue) {
                 return true;
@@ -59,7 +66,7 @@ public class PasswordCracker {
         return false;
     }
     
-    protected void incrementGuess(char minFirstChar, char maxFirstChar) {
+    protected void incrementGuess(char maxFirstChar) {
         for (int x = (guess.length - 1); x >= 0; x--) {
             if (x == 0 && guess[x] < maxFirstChar || x != 0 && guess[x] < maxCharValue) {
                 guess[x]++;
@@ -77,10 +84,5 @@ public class PasswordCracker {
             sb.append(Integer.toString((b & 0xff) + 0x100, 16).substring(1));
         }
         return sb.toString();
-    }
-    
-    public static void main(String[] args) throws Exception {
-        PasswordCracker cracker = new PasswordCracker("MD5");
-        System.out.println(cracker.crack("124534a0ae447b0872b3092731a37d8e", 95, 65));
     }
 }
